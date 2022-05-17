@@ -60,6 +60,60 @@ public class ProducerConfig {
     public static final String VALUE_SERIALIZER = "org.apache.kafka.common.serialization.StringSerializer";
 }
 
+package com.nelson.greg.kafkatest;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Properties;
+
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class KafkatestApplication {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(KafkatestApplication.class);
+	
+
+	public static void main(String[] args) {
+		SpringApplication.run(KafkatestApplication.class, args);
+
+		LOGGER.info("KafkaTestApplication started");
+
+		String bootstrapServer = "127.0.0.1:9092";
+		String groupId = "my-group";
+		String topic = "quickstart-events";
+
+		// CONSUMER
+
+		Properties consumerProperties = new Properties();
+		consumerProperties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
+		consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+		consumerProperties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
+		consumerProperties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
+		consumerProperties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+		KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProperties);
+
+		consumer.subscribe(Arrays.asList(topic));
+
+		while(true) {
+			ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+
+			for (ConsumerRecord<String, String> record : records) {
+				LOGGER.info("Received message: (" + record.key() + ", " + record.value() + ") at offset " + record.offset());
+			}
+		}
+
+	}
+}
 
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
