@@ -63,7 +63,6 @@ public class ProducerConfig {
 package com.nelson.greg.kafkatest;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Properties;
 
@@ -71,6 +70,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -80,7 +80,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class KafkatestApplication {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(KafkatestApplication.class);
-	
 
 	public static void main(String[] args) {
 		SpringApplication.run(KafkatestApplication.class, args);
@@ -91,8 +90,6 @@ public class KafkatestApplication {
 		String groupId = "my-group";
 		String topic = "quickstart-events";
 
-		// CONSUMER
-
 		Properties consumerProperties = new Properties();
 		consumerProperties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
 		consumerProperties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
@@ -102,16 +99,41 @@ public class KafkatestApplication {
 
 		KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProperties);
 
-		consumer.subscribe(Arrays.asList(topic));
+		final Thread consumerThread = Thread.currentThread();
 
-		while(true) {
-			ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				consumer.wakeup();
 
-			for (ConsumerRecord<String, String> record : records) {
-				LOGGER.info("Received message: (" + record.key() + ", " + record.value() + ") at offset " + record.offset());
+				try {
+					consumerThread.join();
+				} catch (InterruptedException e) {
+					LOGGER.error("Interrupted while waiting for consumer thread to exit", e);
+				}
 			}
-		}
+		});
 
+		try {
+
+			consumer.subscribe(Arrays.asList(topic));
+
+			while (true) {
+				ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
+
+				for (ConsumerRecord<String, String> record : records) {
+					LOGGER.info("Received message: (" + record.key() + ", " + record.value() + ") at offset "
+							+ record.offset());
+				}
+			}
+
+		} catch (WakeupException e) {
+			LOGGER.error("Consumer thread interrupted", e);
+		} catch (Exception e) {
+			LOGGER.error("Error while consuming", e);
+		} finally {
+			consumer.close();
+		}
 	}
 }
 
